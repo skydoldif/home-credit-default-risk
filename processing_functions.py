@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import xgboost as xgb
 
 def load_data():
     train = pd.read_csv("data/raw/application_train.csv").set_index('SK_ID_CURR')
@@ -40,6 +41,7 @@ def preprocess(X):
 
 def feature_engineering(X):
     X['NUM_DOCUMENTS_PROVIDED'] = X[[f'FLAG_DOCUMENT_{i}' for i in range(2, 22)]].sum(axis=1)
+    X['PCT_DOCUMENTS_PROVIDED'] = X['NUM_DOCUMENTS_PROVIDED']/sum(range(2,22))
     X['AMT_ANNUITY/AMT_INCOME_TOTAL'] = X['AMT_ANNUITY']/X['AMT_INCOME_TOTAL']
     X['AMT_ANNUITY/AMT_CREDIT'] = X['AMT_ANNUITY']/X['AMT_CREDIT']
     X['AMT_ANNUITY/AMT_GOODS_PRICE'] = X['AMT_ANNUITY']/X['AMT_GOODS_PRICE']
@@ -92,3 +94,6 @@ def compute_description(X, description):
 
     return description, numerical_vars, cat_vars, binary_vars
     
+
+def save_submission(model, X, submission_name):
+    pd.DataFrame(model.predict(xgb.DMatrix(X, enable_categorical=True)), index=X.index, columns=['TARGET']).reset_index().to_csv(f"data/preprocessed/{submission_name}.csv", index=False)
