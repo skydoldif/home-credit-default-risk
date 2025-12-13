@@ -8,9 +8,12 @@ def load_data():
     X_test = preprocess(pd.read_csv("data/raw/application_test.csv").set_index('SK_ID_CURR'))
 
     description = pd.read_csv("data/raw/HomeCredit_columns_description.csv", encoding="latin1", usecols=[1,2,3,4])
-    description = description[description.Table=='application_{train|test}.csv'].drop('Table', axis=1)
+    description = description[description.Table=='application_{train|test}.csv'].drop('Table', axis=1).rename({'Row': 'Feature'}, axis=1)
 
     description_X_trainval, numerical_vars, cat_vars, binary_vars = compute_description(X_trainval, description)
+
+    X_trainval[cat_vars] = X_trainval[cat_vars].astype('category')
+    X_test[cat_vars] = X_test[cat_vars].astype('category')
 
     return (
         X_trainval, 
@@ -35,34 +38,57 @@ def preprocess(X):
 
     return X
 
+def feature_engineering(X):
+    X['NUM_DOCUMENTS_PROVIDED'] = X[[f'FLAG_DOCUMENT_{i}' for i in range(2, 22)]].sum(axis=1)
+    X['AMT_ANNUITY/AMT_INCOME_TOTAL'] = X['AMT_ANNUITY']/X['AMT_INCOME_TOTAL']
+    X['AMT_ANNUITY/AMT_CREDIT'] = X['AMT_ANNUITY']/X['AMT_CREDIT']
+    X['AMT_ANNUITY/AMT_GOODS_PRICE'] = X['AMT_ANNUITY']/X['AMT_GOODS_PRICE']
+    X['AMT_CREDIT/AMT_GOODS_PRICE'] = X['AMT_CREDIT']/X['AMT_GOODS_PRICE']
+    X['AMT_CREDIT/AMT_INCOME_TOTAL'] = X['AMT_CREDIT']/X['AMT_INCOME_TOTAL']
+    X['CNT_CHILDREN/CNT_FAM_MEMBERS'] = X['CNT_CHILDREN']/X['CNT_FAM_MEMBERS']
+    X['EMPLOYEMENT_AGE_RATIO'] = X['DAYS_EMPLOYED']/X['DAYS_BIRTH']
+    X['DEF_30_CNT_SOCIAL_CIRCLE / OBS_30_CNT_SOCIAL_CIRCLE'] = X['DEF_30_CNT_SOCIAL_CIRCLE'] / X['OBS_30_CNT_SOCIAL_CIRCLE']
+    X['DEF_60_CNT_SOCIAL_CIRCLE / OBS_60_CNT_SOCIAL_CIRCLE'] = X['DEF_60_CNT_SOCIAL_CIRCLE'] / X['OBS_60_CNT_SOCIAL_CIRCLE']
+
+    education_order = {
+        "Lower secondary": 1,
+        "Secondary / secondary special": 2,
+        "Incomplete higher": 3,
+        "Higher education": 4,
+        "Academic degree": 5
+    }
+    X['NAME_EDUCATION_TYPE'] = X['NAME_EDUCATION_TYPE'].replace(education_order).astype('int64')
+
+    return X
+
 def compute_description(X, description):
     description['dtype'] = pd.NA
     description['TYPE'] = pd.NA
     description['nunique'] = pd.NA
 
     for col in X:
-        description.loc[description.Row==col, 'dtype'] = X[col].dtype
-        description.loc[description.Row==col, 'nunique'] = X[col].nunique()
+        description.loc[description.Feature==col, 'dtype'] = X[col].dtype
+        description.loc[description.Feature==col, 'nunique'] = X[col].nunique()
         
         if X[col].dtype=='int64' and X[col].nunique()==2:
             if X[col].isna().sum() == 0:
-                description.loc[description.Row==col, 'TYPE'] = 'BINARY'
+                description.loc[description.Feature==col, 'TYPE'] = 'BINARY'
             else:
-                description.loc[description.Row==col, 'TYPE'] = 'CATEGORICAL'
+                description.loc[description.Feature==col, 'TYPE'] = 'CATEGORICAL'
         elif X[col].dtype == 'object':
-            description.loc[description.Row==col, 'TYPE'] = 'CATEGORICAL'
+            description.loc[description.Feature==col, 'TYPE'] = 'CATEGORICAL'
         elif X[col].dtype == 'float64' or X[col].dtype == 'int64':
-            description.loc[description.Row==col, 'TYPE'] = 'NUMERIC'
+            description.loc[description.Feature==col, 'TYPE'] = 'NUMERIC'
             
     description = description.merge(
-        X.isna().sum().reset_index().rename({0: 'NaN count'}, axis=1), left_on='Row', right_on='index', how='inner'
+        X.isna().sum().reset_index().rename({0: 'NaN count'}, axis=1), left_on='Feature', right_on='index', how='inner'
     ).drop('index', axis=1)
     description['NaN %'] = (description['NaN count']/X.shape[0]*100).round(2)
     description['Special'] = description['Special'].fillna('')
 
-    numerical_vars = description[description.TYPE=='NUMERIC'].Row.tolist()
-    binary_vars = description[description.TYPE=='BINARY'].Row.tolist()
-    cat_vars = description[description.TYPE=='CATEGORICAL'].Row.tolist()
+    numerical_vars = description[description.TYPE=='NUMERIC'].Feature.tolist()
+    binary_vars = description[description.TYPE=='BINARY'].Feature.tolist()
+    cat_vars = description[description.TYPE=='CATEGORICAL'].Feature.tolist()
 
     return description, numerical_vars, cat_vars, binary_vars
     
