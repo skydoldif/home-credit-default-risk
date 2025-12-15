@@ -97,3 +97,17 @@ def compute_description(X, description):
 
 def save_submission(model, X, submission_name):
     pd.DataFrame(model.predict(xgb.DMatrix(X, enable_categorical=True)), index=X.index, columns=['TARGET']).reset_index().to_csv(f"data/preprocessed/{submission_name}.csv", index=False)
+
+def get_ordered_importance(importance):
+    importance = pd.Series(importance).sort_values(ascending=False).reset_index()
+    importance.columns = ['Feature', 'Importance']
+    importance['%Importance'] = importance['Importance']/importance['Importance'].sum()*100
+    importance['CUMSUM %Importance'] = importance['%Importance'].cumsum()
+    return importance
+
+def get_ordered_shap_importance(X, shap_values):
+    shap_importance = pd.DataFrame(pd.DataFrame(shap_values, columns=X.columns).abs().mean(axis=0).sort_values(ascending=False)).reset_index()
+    shap_importance.columns = ['Feature', 'shap_importance']
+    shap_importance['%shap_importance'] = shap_importance['shap_importance']/shap_importance['shap_importance'].sum()*100
+    shap_importance['CUMSUM %shap_importance'] = shap_importance['%shap_importance'].cumsum()
+    return shap_importance
