@@ -150,6 +150,7 @@ def model_training_and_evaluation(
         evals_result=results,
         verbose_eval=False
     )
+    print(f"AUC on validation_set: {results['test']['auc'][model.best_iteration]:.5f}")
 
     importance = model.get_score(importance_type='gain')
     xgb.plot_importance(model, importance_type='gain', title='Gain Feature Importance', max_num_features=30)
