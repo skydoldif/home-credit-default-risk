@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import xgboost as xgb
+import shap
+import matplotlib.pyplot as plt
 
 def load_data():
     train = pd.read_csv("data/raw/application_train.csv").set_index('SK_ID_CURR')
@@ -59,7 +61,7 @@ def feature_engineering(X):
         "Higher education": 4,
         "Academic degree": 5
     }
-    X['NAME_EDUCATION_TYPE'] = X['NAME_EDUCATION_TYPE'].replace(education_order).astype('int64')
+    X['NAME_EDUCATION_TYPE_ORDINAL'] = X['NAME_EDUCATION_TYPE'].replace(education_order).astype('int64')
 
     return X
 
@@ -111,3 +113,61 @@ def get_ordered_shap_importance(X, shap_values):
     shap_importance['%shap_importance'] = shap_importance['shap_importance']/shap_importance['shap_importance'].sum()*100
     shap_importance['CUMSUM %shap_importance'] = shap_importance['%shap_importance'].cumsum()
     return shap_importance
+
+def model_training_and_evaluation(
+    params, X_trainval, y_trainval, X_train, y_train, X_val, y_val, X_test, submission_name, seed=42,
+    nfold=5, num_boost_round=1000, early_stopping_rounds=10,
+    stratified=True, metrics="auc",
+):
+
+    dtrainval = xgb.DMatrix(X_trainval, label=y_trainval, enable_categorical=True)
+    dtrain = xgb.DMatrix(X_train, label=y_train, enable_categorical=True)
+    dval = xgb.DMatrix(X_val, label=y_val, enable_categorical=True)
+
+    cv_results = xgb.cv(
+        params=params,
+        dtrain=dtrainval,
+        num_boost_round=num_boost_round,
+        nfold=nfold,
+        stratified=stratified,
+        metrics=metrics,
+        early_stopping_rounds=early_stopping_rounds,
+        seed=seed,
+        verbose_eval=False
+    )
+    best_iteration = cv_results['test-auc-mean'].idxmax() + 1
+    best_auc = cv_results["test-auc-mean"].iloc[-1]
+
+    print(f"Best Iteration: {best_iteration}")
+    print(f"Best CV AUC: {best_auc:.5f}")
+
+    results = {}
+    model = xgb.train(
+        params=params,
+        dtrain=dtrain,
+        num_boost_round=best_iteration,
+        evals=[(dtrain, 'train'), (dval, 'test')],
+        evals_result=results,
+        verbose_eval=False
+    )
+
+    importance = model.get_score(importance_type='gain')
+    xgb.plot_importance(model, importance_type='gain', title='Gain Feature Importance', max_num_features=30)
+    plt.show()
+
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(dval)
+    plt.figure()
+    shap.summary_plot(shap_values, X_val)
+
+    model = xgb.train(
+        params=params,
+        dtrain=dtrainval,
+        num_boost_round=best_iteration,
+        evals=[(dtrainval, 'train')],
+        evals_result=results,
+        verbose_eval=False
+    )
+    save_submission(model, X_test[model.feature_names], submission_name=submission_name)
+
+    return importance, shap_values, model
