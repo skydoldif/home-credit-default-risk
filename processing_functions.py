@@ -139,7 +139,7 @@ def model_training_and_evaluation(
     best_auc = cv_results["test-auc-mean"].iloc[-1]
 
     print(f"Best Iteration: {best_iteration}")
-    print(f"Best CV AUC: {best_auc:.5f}")
+    print(f"Best CV AUC: {best_auc:.5f} +/- {cv_results['test-auc-std'].iloc[-1]:.5f}")
 
     results = {}
     model = xgb.train(
@@ -150,7 +150,7 @@ def model_training_and_evaluation(
         evals_result=results,
         verbose_eval=False
     )
-    print(f"AUC on validation_set: {results['test']['auc'][model.best_iteration]:.5f}")
+    print(f"AUC on validation_set: {results['test']['auc'][-1]:.5f}")
 
     importance = model.get_score(importance_type='gain')
     xgb.plot_importance(model, importance_type='gain', title='Gain Feature Importance', max_num_features=30)
