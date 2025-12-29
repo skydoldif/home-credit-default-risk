@@ -41,7 +41,7 @@ def preprocess(X):
 
     return X
 
-def feature_engineering(X):
+def feature_engineering(X, additional_features=False):
     X['NUM_DOCUMENTS_PROVIDED'] = X[[f'FLAG_DOCUMENT_{i}' for i in range(2, 22)]].sum(axis=1)
     X['PCT_DOCUMENTS_PROVIDED'] = X['NUM_DOCUMENTS_PROVIDED']/sum(range(2,22))
     X['AMT_ANNUITY/AMT_INCOME_TOTAL'] = X['AMT_ANNUITY']/X['AMT_INCOME_TOTAL']
@@ -62,6 +62,72 @@ def feature_engineering(X):
         "Academic degree": 5
     }
     X['NAME_EDUCATION_TYPE_ORDINAL'] = X['NAME_EDUCATION_TYPE'].replace(education_order).astype('int64')
+
+
+    if additional_features:
+        X['OWN_CAR_AGE_RATIO'] = X['OWN_CAR_AGE']/X['DAYS_BIRTH']
+        X['HAS_CLIENT_PROVIDED_CONTACT'] = X['FLAG_MOBIL'] | X['FLAG_EMP_PHONE'] | X['FLAG_WORK_PHONE'] | X['FLAG_WORK_PHONE'] | X['FLAG_PHONE'] | X['FLAG_EMAIL']
+        X['STRANGE_ADDRESS_REGION'] = X['REG_REGION_NOT_LIVE_REGION'] | X['REG_REGION_NOT_WORK_REGION'] | X['LIVE_REGION_NOT_WORK_REGION']
+        X['STRANGE_ADDRESS_CITY'] = X['REG_CITY_NOT_LIVE_CITY'] | X['REG_CITY_NOT_WORK_CITY'] | X['LIVE_CITY_NOT_WORK_CITY']
+        X['STRANGE_ADDRESS'] = X['STRANGE_ADDRESS_REGION'] | X['STRANGE_ADDRESS_CITY']
+
+        X['NAME_INCOME_TYPE_SIMPLIFIED'] = X['NAME_INCOME_TYPE'].replace({
+            'Unemployed': 'Other',
+            'Student': 'Other',
+            'Businessman': 'Other',
+            'Maternity leave': 'Other'
+        })
+
+        X['NAME_TYPE_SUITE_SIMPLIFIED'] = X['NAME_TYPE_SUITE'].replace({
+            'Family': 'Accompanied',
+            'Spouse, partner': 'Accompanied',
+            'Children': 'Accompanied',
+            'Group of people': 'Accompanied',
+            'Other_A': 'Other',
+            'Other_B': 'Other',
+        })
+
+        X['NAME_TYPE_SUITE_SIMPLIFIED2'] = X['NAME_TYPE_SUITE'].replace({
+            'Unaccompanied': 'Unaccompanied',
+            'Family': 'Accompanied',
+            'Spouse, partner': 'Accompanied',
+            'Children': 'Accompanied',
+            'Group of people': 'Accompanied',
+            'Other_A': 'Accompanied',
+            'Other_B': 'Accompanied',
+        })
+
+        X['NAME_FAMILY_STATUS_SIMPLIFIED'] = X['NAME_FAMILY_STATUS'].replace({
+            'Civil marriage': 'Married',
+        })
+
+        X['NAME_FAMILY_STATUS_SIMPLIFIED2'] = X['NAME_FAMILY_STATUS'].replace({
+            'Married': 1,
+            'Civil marriage': 1,
+            'Single / not married': 0,
+            'Separated': 0,
+            'Widow': 0,
+        }).astype('float64')
+
+        X['NAME_HOUSING_TYPE_SIMPLIFIED'] = X['NAME_HOUSING_TYPE'].replace({
+            'House / apartment': 1,
+            'With parents': 0,
+            'Municipal apartment': 0,
+            'Rented apartment': 0,
+            'Office apartment': 0,
+            'Co-op apartment': 0,
+        }).astype('float64')
+
+        X['OCCUPATION_TYPE_SIMPLIFIED'] = X['OCCUPATION_TYPE'].astype(str).fillna('Missing').astype('category')
+
+        X['ORGANIZATION_TYPE_SIMPLIFIED'] = X['ORGANIZATION_TYPE'].astype(str).fillna('Missing').astype('category')
+
+        X['ORGANIZATION_TYPE_SIMPLIFIED2'] = X['ORGANIZATION_TYPE'].str.replace(r'Type\s*\d+', '', regex=True, case=False).str.strip().astype(str).fillna('Missing').astype('category')
+
+        X['FONDKAPREMONT_MODE_SIMPLIFIED'] = X['FONDKAPREMONT_MODE'].astype(str).fillna('Missing').astype('category')
+        X['HOUSETYPE_MODE_SIMPLIFIED'] = X['HOUSETYPE_MODE'].astype(str).fillna('Missing').astype('category')
+        X['WALLSMATERIAL_MODE_SIMPLIFIED'] = X['WALLSMATERIAL_MODE'].astype(str).fillna('Missing').astype('category').replace({'Other': 'Missing'})
+        X['EMERGENCYSTATE_MODE_SIMPLIFIED'] = X['EMERGENCYSTATE_MODE'].astype(str).fillna('Missing').astype('category')
 
     return X
 
